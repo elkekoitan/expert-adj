@@ -47,7 +47,7 @@ class OptimizationSession(BaseModel):
     completed_at = Column(String, nullable=True)
 
     # Metadata
-    metadata = Column(JSONB, default={})
+    meta_data = Column(JSONB, default={})
     error_message = Column(String, nullable=True)
 
     # Relationships
@@ -120,7 +120,7 @@ class BacktestResult(BaseModel):
     # Metadata
     terminal_build = Column(String(50), nullable=True)
     data_version = Column(String(50), nullable=True)
-    metadata = Column(JSONB, default={})
+    meta_data = Column(JSONB, default={})
 
     # Relationships
     optimization_session = relationship("OptimizationSession", back_populates="backtest_results")

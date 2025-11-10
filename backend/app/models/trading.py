@@ -40,7 +40,7 @@ class TradingAccount(BaseModel):
 
     # Metadata
     last_heartbeat = Column(String, nullable=True)
-    metadata = Column(JSONB, default={})
+    meta_data = Column(JSONB, default={})
 
     # Relationships
     owner = relationship("User", back_populates="trading_accounts")
@@ -83,7 +83,7 @@ class LiveSession(BaseModel):
     stopped_at = Column(String, nullable=True)
 
     # Metadata
-    metadata = Column(JSONB, default={})
+    meta_data = Column(JSONB, default={})
 
     # Relationships
     account = relationship("TradingAccount", back_populates="live_sessions")
@@ -120,7 +120,7 @@ class Trade(BaseModel):
 
     # Metadata
     comment = Column(String(255), nullable=True)
-    metadata = Column(JSONB, default={})
+    meta_data = Column(JSONB, default={})
 
     # Relationships
     session = relationship("LiveSession", back_populates="trades")
@@ -154,7 +154,7 @@ class Position(BaseModel):
 
     # Metadata
     comment = Column(String(255), nullable=True)
-    metadata = Column(JSONB, default={})
+    meta_data = Column(JSONB, default={})
 
     # Relationships
     session = relationship("LiveSession", back_populates="positions")

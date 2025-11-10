@@ -52,7 +52,7 @@ class EAVersion(BaseModel):
     requires_sdk = Column(Boolean, default=False)
     compiled_at = Column(String, nullable=True)
 
-    metadata = Column(JSONB, default={})
+    meta_data = Column(JSONB, default={})
 
     # Relationships
     expert_advisor = relationship("ExpertAdvisor", back_populates="versions")

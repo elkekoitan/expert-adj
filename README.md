@@ -10,6 +10,33 @@
 
 ---
 
+## ⚡ Quick Start
+
+Get up and running in 3 minutes:
+
+```bash
+# 1. Clone and setup
+git clone https://github.com/yourusername/expert-adj.git
+cd expert-adj
+cp .env.example .env
+
+# 2. Start all services
+docker compose up -d
+
+# 3. Initialize database
+docker compose exec api alembic upgrade head
+```
+
+**🎉 Done!**
+- Dashboard: http://localhost:3000/dashboard
+- API Docs: http://localhost:8000/docs
+
+**📖 Detailed Guides:**
+- [Complete Deployment Guide](DEPLOYMENT.md) - Production setup, SSL, monitoring
+- [Live Trading Guide](docs/LIVE_TRADING_GUIDE.md) - Connect MT4/MT5, deploy EA, monitor trades
+
+---
+
 ## 📋 İçindekiler
 
 - [Özellikler](#-özellikler)
