@@ -17,6 +17,8 @@ from app.models.preset import (
 from app.models.trading import LiveSession, Position, Trade, TradingAccount
 from app.models.user import Organization, User
 
+from app.models.strategy import StrategyPreset, BacktestRun, ForwardRun
+
 __all__ = [
     "User",
     "Organization",
@@ -35,4 +37,7 @@ __all__ = [
     "Trade",
     "Position",
     "Instrument",
+    "StrategyPreset",
+    "BacktestRun",
+    "ForwardRun",
 ]

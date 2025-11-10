@@ -1,5 +1,12 @@
 """
 EA Parameter Preset endpoints
+
+Not:
+Bu dosya EAParameterPreset / Template / Comparison mantığını korur.
+StrategyPreset tabanlı yeni preset sistemi backend/app/models/strategy.py ve
+ilgili strategy_presets / backtest_runs / forward_runs tabloları ile ayrı katman
+olarak eklendi. Böylece mevcut uçlar bozulmadan yeni otomasyon katmanı
+(StrategyPreset) paralel çalışabilir.
 """
 
 from typing import List, Optional

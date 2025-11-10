@@ -68,13 +68,13 @@ class AccountService:
         encrypted_password = encrypt_password(password)
 
         account = TradingAccount(
-            user_id=user_id,
-            name=name,
+            owner_id=user_id,
+            label=name,
             account_type=account_type,
-            broker=broker,
-            login=login,
-            password=encrypted_password,
-            server=server,
+            broker_# server field handled above
+            account_number=str(login),
+            encrypted_password=encrypted_password,
+            # server field handled above
             platform=platform,
             description=description,
             is_active=True,
