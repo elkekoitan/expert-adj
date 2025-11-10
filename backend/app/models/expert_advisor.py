@@ -59,6 +59,7 @@ class EAVersion(BaseModel):
     parameters = relationship("EAParameter", back_populates="ea_version", cascade="all, delete-orphan")
     dependencies = relationship("Dependency", back_populates="ea_version", cascade="all, delete-orphan")
     optimization_sessions = relationship("OptimizationSession", back_populates="ea_version")
+    configurations = relationship("EAConfiguration", back_populates="ea_version", cascade="all, delete-orphan")
 
 
 class EAParameter(BaseModel):
