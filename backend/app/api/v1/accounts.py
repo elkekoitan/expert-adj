@@ -1,18 +1,28 @@
 """
 Trading Account Management Endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import List, Optional
+
 from datetime import datetime
+from typing import List, Optional
+from uuid import UUID
+
+from app.core.database import get_db
+from app.services.account_service import AccountService, get_account_service
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# from app.core.security import get_current_user  # TODO: Enable when auth is ready
 
 router = APIRouter()
 
 
 # ==================== REQUEST MODELS ====================
 
+
 class AccountCreate(BaseModel):
     """Create trading account"""
+
     platform: str  # MT4 or MT5
     broker_server: str
     account_number: str
@@ -23,12 +33,14 @@ class AccountCreate(BaseModel):
 
 class AccountUpdate(BaseModel):
     """Update trading account"""
+
     label: Optional[str] = None
     is_active: Optional[bool] = None
 
 
 class LiveSessionCreate(BaseModel):
     """Create live trading session"""
+
     account_id: str
     ea_version_id: str
     symbol: str
@@ -39,11 +51,13 @@ class LiveSessionCreate(BaseModel):
 
 class LiveSessionUpdate(BaseModel):
     """Update live session"""
+
     status: Optional[str] = None
     parameters: Optional[dict] = None
 
 
 # ==================== ENDPOINTS ====================
+
 
 @router.post("/")
 async def create_account(account: AccountCreate):
@@ -77,7 +91,7 @@ async def create_account(account: AccountCreate):
         "account_type": account.account_type,
         "is_active": True,
         "is_connected": False,
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
     }
 
 
@@ -104,10 +118,10 @@ async def list_accounts():
                 "equity": 10250.00,
                 "margin": 500.00,
                 "free_margin": 9750.00,
-                "profit": 250.00
+                "profit": 250.00,
             }
         ],
-        "total": 1
+        "total": 1,
     }
 
 
@@ -134,7 +148,7 @@ async def get_account(account_id: str):
         "profit": 250.00,
         "leverage": 100,
         "currency": "USD",
-        "last_heartbeat": datetime.now().isoformat()
+        "last_heartbeat": datetime.now().isoformat(),
     }
 
 
@@ -145,10 +159,7 @@ async def update_account(account_id: str, update: AccountUpdate):
     """
     # TODO: Implement account update
 
-    return {
-        "id": account_id,
-        "updated": True
-    }
+    return {"id": account_id, "updated": True}
 
 
 @router.delete("/{account_id}")
@@ -158,10 +169,7 @@ async def delete_account(account_id: str):
     """
     # TODO: Implement account deletion
 
-    return {
-        "id": account_id,
-        "deleted": True
-    }
+    return {"id": account_id, "deleted": True}
 
 
 @router.post("/{account_id}/test-connection")
@@ -179,11 +187,12 @@ async def test_connection(account_id: str):
         "connected": True,
         "balance": 10000.00,
         "equity": 10250.00,
-        "server_time": datetime.now().isoformat()
+        "server_time": datetime.now().isoformat(),
     }
 
 
 # ==================== LIVE SESSIONS ====================
+
 
 @router.post("/{account_id}/sessions/start")
 async def start_live_session(account_id: str, session: LiveSessionCreate):
@@ -225,7 +234,7 @@ async def start_live_session(account_id: str, session: LiveSessionCreate):
         "symbol": session.symbol,
         "timeframe": session.timeframe,
         "status": "running",
-        "started_at": datetime.now().isoformat()
+        "started_at": datetime.now().isoformat(),
     }
 
 
@@ -248,10 +257,10 @@ async def list_sessions(account_id: str):
                 "current_profit": 125.50,
                 "total_trades": 15,
                 "winning_trades": 12,
-                "started_at": datetime.now().isoformat()
+                "started_at": datetime.now().isoformat(),
             }
         ],
-        "total": 1
+        "total": 1,
     }
 
 
@@ -269,10 +278,7 @@ async def get_session(account_id: str, session_id: str):
         "symbol": "EURUSD",
         "timeframe": "M15",
         "status": "running",
-        "parameters": {
-            "lot": 0.01,
-            "tp": 500
-        },
+        "parameters": {"lot": 0.01, "tp": 500},
         "magic_numbers": [10001, 10002],
         "current_profit": 125.50,
         "peak_profit": 150.00,
@@ -282,7 +288,7 @@ async def get_session(account_id: str, session_id: str):
         "winning_trades": 12,
         "losing_trades": 3,
         "open_positions": 2,
-        "started_at": datetime.now().isoformat()
+        "started_at": datetime.now().isoformat(),
     }
 
 
@@ -299,7 +305,7 @@ async def stop_session(account_id: str, session_id: str):
     return {
         "session_id": session_id,
         "status": "stopped",
-        "stopped_at": datetime.now().isoformat()
+        "stopped_at": datetime.now().isoformat(),
     }
 
 
@@ -320,7 +326,7 @@ async def get_session_positions(account_id: str, session_id: str):
                 "open_price": 1.0850,
                 "current_price": 1.0865,
                 "profit": 15.00,
-                "open_time": datetime.now().isoformat()
+                "open_time": datetime.now().isoformat(),
             },
             {
                 "ticket": 123457,
@@ -330,11 +336,11 @@ async def get_session_positions(account_id: str, session_id: str):
                 "open_price": 1.0840,
                 "current_price": 1.0865,
                 "profit": 50.00,
-                "open_time": datetime.now().isoformat()
-            }
+                "open_time": datetime.now().isoformat(),
+            },
         ],
         "total": 2,
-        "total_profit": 65.00
+        "total_profit": 65.00,
     }
 
 
@@ -356,9 +362,9 @@ async def get_session_trades(account_id: str, session_id: str):
                 "close_price": 1.0880,
                 "profit": 50.00,
                 "open_time": datetime.now().isoformat(),
-                "close_time": datetime.now().isoformat()
+                "close_time": datetime.now().isoformat(),
             }
         ],
         "total": 1,
-        "total_profit": 50.00
+        "total_profit": 50.00,
     }
