@@ -5,8 +5,11 @@ Expert Advisor endpoints
 import hashlib
 from datetime import datetime
 from typing import List, Optional
+from uuid import UUID, uuid4
 
 from app.core.database import get_db
+from app.services.ea_service import EAService
+from app.services.s3 import S3Service, get_s3_service
 from app.utils.mql_parser import extract_parameters_from_mql, generate_parameter_summary
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
