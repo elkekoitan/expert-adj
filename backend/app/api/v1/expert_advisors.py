@@ -19,7 +19,9 @@ async def upload_ea(
     file: UploadFile = File(...),
     name: Optional[str] = None,
     description: Optional[str] = None,
+    version: str = "1.0",
     db: AsyncSession = Depends(get_db),
+    s3_service: S3Service = Depends(get_s3_service),
     # current_user = Depends(get_current_user)
 ):
     """
