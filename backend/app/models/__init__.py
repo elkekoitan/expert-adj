@@ -1,11 +1,21 @@
 """
 Database models
 """
-from app.models.user import User, Organization
-from app.models.expert_advisor import ExpertAdvisor, EAVersion, EAParameter, Dependency
-from app.models.optimization import OptimizationSession, BacktestResult, OptimizationBatch
-from app.models.trading import TradingAccount, LiveSession, Trade, Position
+
+from app.models.expert_advisor import Dependency, EAParameter, EAVersion, ExpertAdvisor
 from app.models.instrument import Instrument
+from app.models.optimization import (
+    BacktestResult,
+    OptimizationBatch,
+    OptimizationSession,
+)
+from app.models.preset import (
+    EAParameterComparison,
+    EAParameterPreset,
+    EAParameterTemplate,
+)
+from app.models.trading import LiveSession, Position, Trade, TradingAccount
+from app.models.user import Organization, User
 
 __all__ = [
     "User",
@@ -14,6 +24,9 @@ __all__ = [
     "EAVersion",
     "EAParameter",
     "Dependency",
+    "EAParameterPreset",
+    "EAParameterTemplate",
+    "EAParameterComparison",
     "OptimizationSession",
     "BacktestResult",
     "OptimizationBatch",

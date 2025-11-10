@@ -55,8 +55,8 @@ services:
   # FastAPI Backend
   api:
     build:
-      context: ./backend
-      dockerfile: ../docker/backend.Dockerfile
+      context: .
+      dockerfile: docker/backend.Dockerfile
     container_name: mt-optimizer-api
     ports:
       - "8000:8000"
@@ -81,8 +81,8 @@ services:
   # Celery Worker
   celery-worker:
     build:
-      context: ./backend
-      dockerfile: ../docker/backend.Dockerfile
+      context: .
+      dockerfile: docker/backend.Dockerfile
     container_name: mt-optimizer-celery
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/mt_optimizer
@@ -102,8 +102,8 @@ services:
   # Flower (Celery monitoring)
   flower:
     build:
-      context: ./backend
-      dockerfile: ../docker/backend.Dockerfile
+      context: .
+      dockerfile: docker/backend.Dockerfile
     container_name: mt-optimizer-flower
     ports:
       - "5555:5555"
@@ -118,8 +118,8 @@ services:
   # Next.js Frontend
   frontend:
     build:
-      context: ./frontend
-      dockerfile: ../docker/frontend.Dockerfile
+      context: .
+      dockerfile: docker/frontend.Dockerfile
     container_name: mt-optimizer-frontend
     ports:
       - "3000:3000"
