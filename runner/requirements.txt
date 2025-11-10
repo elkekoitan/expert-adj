@@ -1,0 +1,24 @@
+# MT5 Integration
+MetaTrader5==5.0.4510
+
+# Configuration
+python-dotenv==1.0.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# HTTP Client (for API communication)
+httpx==0.26.0
+aiohttp==3.9.1
+
+# Data Processing
+pandas==2.1.4
+numpy==1.26.3
+
+# Logging
+python-json-logger==2.0.7
+
+# File Processing
+aiofiles==23.2.1
+
+# Process Management
+psutil==5.9.7
