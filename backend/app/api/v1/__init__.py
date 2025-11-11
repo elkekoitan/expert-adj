@@ -3,9 +3,18 @@ API v1 Router
 """
 from fastapi import APIRouter
 
-from app.api.v1 import health, auth, expert_advisors, presets, optimizations, backtests, trading
+from app.api.v1 import (
+    health,
+    auth,
+    expert_advisors,
+    presets,
+    optimizations,
+    backtests,
+    trading,
+)
 # Use updated accounts
 from app.api.v1 import accounts_updated as accounts
+from app.api.v1 import strategy_presets
 
 api_router = APIRouter()
 
@@ -18,3 +27,4 @@ api_router.include_router(optimizations.router, prefix="/optimizations", tags=["
 api_router.include_router(backtests.router, prefix="/backtests", tags=["backtests"])
 api_router.include_router(trading.router, prefix="/trading", tags=["trading"])
 api_router.include_router(accounts.router, prefix="/accounts", tags=["accounts"])
+api_router.include_router(strategy_presets.router, prefix="/strategy-presets", tags=["strategy-presets"])

@@ -8,7 +8,7 @@ import signal
 import sys
 from pathlib import Path
 
-from runner.config import settings
+from .config import settings
 from runner.mt5.backtest_runner import BacktestRunner
 
 # Configure logging

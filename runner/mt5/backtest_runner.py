@@ -1,13 +1,27 @@
 """
-Backtest Runner
-Executes backtest jobs from API queue
-"""
-import logging
-import asyncio
-from typing import Dict, Any, Optional
-from pathlib import Path
+NewBornDongu - MT4 Backtest Runner
 
-from runner.mt5.terminal_controller import MT5TerminalController
+Bu modül, backend'den gelen BacktestRun işlerini okuyup
+Tickmill MT4 terminali üzerinde NewBornDongu_ParalelRobotlar.mq4 ile gerçek backtest
+tetiklemek için iskelet sağlar.
+
+ÖNEMLİ NOTLAR:
+- Bu kod, MetaTrader5 Python modülünü ve Strategy Tester entegrasyonunu kullanmak için iskelet sunar.
+- Senin makinedeki MT4 terminal dosya yapısı, dil ayarları, hesap izinleri,
+  NewBornDongu parametreleri vb. runtime'da doğrulanmalıdır.
+- Buradaki amaç: Runner tarafında "queued backtest" gördüğünde
+  MT4 terminalini initialize et, login ol, test çalıştır, sonucu backend'e POST et.
+"""
+
+import logging
+from pathlib import Path
+from typing import Optional
+
+try:
+    import MetaTrader5 as mt5
+except ImportError:
+    mt5 = None
+
 from runner.config import settings
 
 logger = logging.getLogger(__name__)
@@ -15,193 +29,135 @@ logger = logging.getLogger(__name__)
 
 class BacktestRunner:
     """
-    Manages backtest execution
+    BacktestRunner:
+    - MT4 terminali initialize eder
+    - Tickmill demo hesabına login olur (env'den)
+    - NewBornDongu_ParalelRobotlar.mq4 için iskelet backtest fonksiyonlarını sağlar
+    - Sonuçları ileride backend'e yazmak için döndürür
     """
 
-    def __init__(self):
-        self.work_dir = Path(settings.WORK_DIR)
-        self.work_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(self) -> None:
+        self.terminal_path = settings.MT5_TERMINAL_PATH
+        self.data_path = settings.MT5_DATA_PATH
+        self.login = settings.MT5_LOGIN
+        self.password = settings.MT5_PASSWORD
+        self.server = settings.MT5_SERVER
 
-    async def run_backtest(
-        self,
-        job_id: str,
-        ea_file: str,
-        symbol: str,
-        timeframe: str,
-        date_from: str,
-        date_to: str,
-        parameters: Dict[str, Any],
-        deposit: float = 10000,
-        leverage: int = 100
-    ) -> Dict[str, Any]:
+    def _check_mt5_available(self) -> bool:
+        if mt5 is None:
+            logger.error("MetaTrader5 Python modülü yüklü değil. 'pip install MetaTrader5' gerekli.")
+            return False
+        return True
+
+    def initialize_terminal(self) -> bool:
         """
-        Execute single backtest
-
-        Args:
-            job_id: Job identifier
-            ea_file: Path to EA file
-            symbol: Trading symbol
-            timeframe: Chart timeframe
-            date_from: Start date
-            date_to: End date
-            parameters: EA parameters
-            deposit: Initial deposit
-            leverage: Account leverage
-
-        Returns:
-            Backtest results
+        MT4/MT5 terminalini verilen path ile initialize etmeyi dener.
         """
-        logger.info(f"Starting backtest job: {job_id}")
+        if not self._check_mt5_available():
+            return False
 
-        controller = MT5TerminalController(
-            terminal_path=settings.MT5_TERMINAL_PATH,
-            data_path=settings.MT5_DATA_PATH,
-            work_dir=str(self.work_dir),
-            timeout=settings.MT5_TIMEOUT
-        )
+        if not self.terminal_path:
+            logger.error("MT5_TERMINAL_PATH tanımlı değil.")
+            return False
+
+        if not Path(self.terminal_path).exists():
+            logger.error(f"MT terminal path bulunamadı: {self.terminal_path}")
+            return False
+
+        logger.info(f"MT terminal initialize ediliyor: {self.terminal_path}")
+
+        # Not: MT5.initialize MT5 terminalini kullanır, MT4 için doğrudan destek yoktur.
+        # Tickmill MT4 çalışıyorsa, bu noktada mevcut bağlantıyı kullanmak için login deneyebiliriz.
+        if not mt5.initialize(path=self.terminal_path):
+            logger.error(f"mt5.initialize başarısız: {mt5.last_error()}")
+            return False
+
+        logger.info("MT terminal initialize başarılı")
+        return True
+
+    def login_account(self) -> bool:
+        """
+        Tickmill hesabına login olmayı dener.
+        Zaten bağlıysa, bu çağrı başarısız olsa da mevcut session devam edebilir.
+        """
+        if not self._check_mt5_available():
+            return False
+
+        if not (self.login and self.password and self.server):
+            logger.warning("Login bilgileri eksik (MT5_LOGIN / MT5_PASSWORD / MT5_SERVER). Mevcut oturum kullanılacak.")
+            return True
 
         try:
-            # Prepare configuration
-            config_file = controller.prepare_config(
-                ea_file=ea_file,
-                symbol=symbol,
-                timeframe=timeframe,
-                date_from=date_from,
-                date_to=date_to,
-                parameters=parameters,
-                optimization=False,
-                deposit=deposit,
-                leverage=leverage
-            )
+            login_int = int(self.login)
+        except ValueError:
+            logger.error(f"MT5_LOGIN integer değil: {self.login}")
+            return False
 
-            # Start terminal
-            if not controller.start(config_file):
-                raise Exception("Failed to start MT5 terminal")
+        logger.info(f"Tickmill hesabına login deneniyor: {login_int} @ {self.server}")
+        if not mt5.login(login_int, password=self.password, server=self.server):
+            logger.error(f"Login başarısız: {mt5.last_error()}")
+            return False
 
-            # Wait for completion
-            exit_code = await asyncio.get_event_loop().run_in_executor(
-                None,
-                controller.wait
-            )
+        acc = mt5.account_info()
+        if acc:
+            logger.info(f"Login OK - Balance: {acc.balance}, Name: {acc.name}")
+        else:
+            logger.warning("Login sonrası account_info alınamadı.")
+        return True
 
-            if exit_code != 0:
-                raise Exception(f"MT5 terminal exited with code: {exit_code}")
-
-            # Get results
-            results = controller.get_results()
-
-            if not results:
-                raise Exception("Failed to retrieve results")
-
-            logger.info(f"Backtest job completed: {job_id}")
-
-            return {
-                "status": "success",
-                "job_id": job_id,
-                "results": results
-            }
-
-        except Exception as e:
-            logger.error(f"Backtest job failed: {job_id} - {e}")
-
-            return {
-                "status": "failed",
-                "job_id": job_id,
-                "error": str(e)
-            }
-
-        finally:
-            controller.cleanup()
-
-    async def run_optimization(
+    def run_newborndongu_backtest(
         self,
-        job_id: str,
-        ea_file: str,
         symbol: str,
         timeframe: str,
-        date_from: str,
-        date_to: str,
-        parameter_ranges: Dict[str, Dict[str, Any]],
-        deposit: float = 10000,
-        leverage: int = 100
-    ) -> Dict[str, Any]:
+        date_from: Optional[str],
+        date_to: Optional[str],
+        preset_params: dict,
+    ) -> dict:
         """
-        Execute optimization
+        NewBornDongu için backtest iskeleti.
+        Burada:
+        - Symbol/timeframe kontrolleri
+        - Strategy Tester konfigürasyonu
+        - Sonuç toplama
+        adımlarını senin ortamında test ederek tamamlaman gerekir.
 
-        Args:
-            job_id: Job identifier
-            ea_file: Path to EA file
-            symbol: Trading symbol
-            timeframe: Chart timeframe
-            date_from: Start date
-            date_to: End date
-            parameter_ranges: Parameter ranges for optimization
-            deposit: Initial deposit
-            leverage: Account leverage
-
-        Returns:
-            Optimization results
+        Şu an:
+        - Sadece log atar ve "stub" bir sonuç döner.
+        - Böylece pipeline uçtan uca akarken nerede kaldığını görürsün.
         """
-        logger.info(f"Starting optimization job: {job_id}")
 
-        controller = MT5TerminalController(
-            terminal_path=settings.MT5_TERMINAL_PATH,
-            data_path=settings.MT5_DATA_PATH,
-            work_dir=str(self.work_dir),
-            timeout=settings.MT5_TIMEOUT * 10  # Longer timeout for optimization
-        )
+        logger.info(f"[NB] Backtest START: {symbol} {timeframe} {date_from} -> {date_to}")
+        logger.info(f"[NB] Preset params: {preset_params}")
 
-        try:
-            # For MT5 optimization, we use genetic algorithm
-            # Parameters are defined in the .set file with Start, Stop, Step
-
-            # TODO: Convert parameter_ranges to .set format
-            parameters = {}
-
-            config_file = controller.prepare_config(
-                ea_file=ea_file,
-                symbol=symbol,
-                timeframe=timeframe,
-                date_from=date_from,
-                date_to=date_to,
-                parameters=parameters,
-                optimization=True,
-                deposit=deposit,
-                leverage=leverage
-            )
-
-            if not controller.start(config_file):
-                raise Exception("Failed to start MT5 terminal")
-
-            exit_code = await asyncio.get_event_loop().run_in_executor(
-                None,
-                controller.wait
-            )
-
-            if exit_code != 0:
-                raise Exception(f"MT5 terminal exited with code: {exit_code}")
-
-            results = controller.get_results()
-
-            if not results:
-                raise Exception("Failed to retrieve results")
-
-            logger.info(f"Optimization job completed: {job_id}")
-
-            return {
-                "status": "success",
-                "job_id": job_id,
-                "results": results
-            }
-
-        except Exception as e:
-            logger.error(f"Optimization job failed: {job_id} - {e}")
-
+        if not self._check_mt5_available():
             return {
                 "status": "failed",
-                "job_id": job_id,
-                "error": str(e)
+                "reason": "MetaTrader5 module missing",
             }
 
-        finally:
-            controller.cleanup()
+        # Buraya Strategy Tester entegrasyonu gelecek.
+        # Örnek pseudo-akış (senin terminalinde test edilmesi gerekiyor):
+        # - mt5.symbol_select(symbol, True)
+        # - mt5.copy_rates_range(...)
+        # - NewBornDongu ayarlarına göre trade simülasyonu veya custom command
+        # Şu aşamada bu seviyede sahte kod yazıp 'çalıştı' demiyorum.
+
+        # Şimdilik, pipeline testi için dummy sonuç:
+        result = {
+            "status": "completed",
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "date_from": date_from,
+            "date_to": date_to,
+            "net_profit": 0.0,
+            "trades": 0,
+            "note": "NewBornDongu backtest_runner iskeleti çalıştı; gerçek MT4 test entegrasyonu senin terminal üzerinde finalize edilmeli.",
+        }
+
+        logger.info(f"[NB] Backtest END: {result}")
+        return result
+
+    def shutdown(self) -> None:
+        if self._check_mt5_available():
+            mt5.shutdown()
+            logger.info("MT terminal shutdown çağrıldı")

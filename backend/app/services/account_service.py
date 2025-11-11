@@ -71,10 +71,10 @@ class AccountService:
             owner_id=user_id,
             label=name,
             account_type=account_type,
-            broker_# server field handled above
+            broker=broker,
             account_number=str(login),
             encrypted_password=encrypted_password,
-            # server field handled above
+            server=server,
             platform=platform,
             description=description,
             is_active=True,
