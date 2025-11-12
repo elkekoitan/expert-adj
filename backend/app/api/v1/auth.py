@@ -9,7 +9,7 @@ from app.core import security
 from app.core.database import get_db
 from app.models.user import User
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class TokenResponse(BaseModel):
@@ -63,3 +63,18 @@ async def login(
         }
     )
     return TokenResponse(access_token=token)
+
+
+@router.get("/me", summary="Aktif kullanıcı bilgisi")
+async def read_me(current_user: User = Depends(security.get_current_user)):
+    """
+    JWT'den çözülen aktif kullanıcı bilgisini döner.
+    """
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "username": current_user.username,
+        "is_active": current_user.is_active,
+        "is_superuser": current_user.is_superuser,
+        "organization_id": str(current_user.organization_id) if current_user.organization_id else None,
+    }
