@@ -6,17 +6,23 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.strategy import BacktestRun, StrategyPreset
 from app.models.user import User
 
-router = APIRouter()
+router = APIRouter(prefix="/backtests", tags=["backtests"])
 
 
 class BacktestCreate(BaseModel):
+    """
+    İleriye dönük gerçek runner entegrasyonu için placeholder.
+    Bu vertical slice'ta FE direkt /strategy-presets/{id}/backtests kullanacak.
+    Buradaki model şimdilik dokunulmadan bırakılıyor.
+    """
     preset_id: UUID = Field(..., description="Kullanılacak StrategyPreset ID")
     date_from: str = Field(..., description="Backtest başlangıç tarihi, örn: 2020-01-01")
     date_to: str = Field(..., description="Backtest bitiş tarihi, örn: 2024-01-01")
@@ -48,104 +54,59 @@ class BacktestResponse(BaseModel):
         from_attributes = True
 
 
-@router.post(
-    "/",
-    response_model=BacktestResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def enqueue_backtest(
-    payload: BacktestCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    StrategyPreset'e bağlı bir BacktestRun oluşturur (status=queued).
-    Runner bu kayıtları okuyup çalıştıracak.
-    """
-    preset = (
-        db.query(StrategyPreset)
-        .filter(StrategyPreset.id == payload.preset_id)
-        .first()
-    )
-    if not preset:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Preset not found",
-        )
-
-    run = BacktestRun(
-        owner_id=current_user.id,
-        organization_id=current_user.organization_id,
-        preset_id=payload.preset_id,
-        symbol=preset.symbol or "XAUUSD",
-        timeframe=preset.timeframe or "M15",
-        date_from=payload.date_from,
-        date_to=payload.date_to,
-        engine=payload.engine,
-        parameters=preset.parameters or {},
-        status="queued",
-    )
-    db.add(run)
-    db.commit()
-    db.refresh(run)
-    return run
+# Not: Bu vertical slice'ta generic POST /backtests kullanmıyoruz.
+# FE, doğrudan /strategy-presets/{preset_id}/backtests endpointini çağıracak.
 
 
 @router.get(
     "/",
     response_model=List[BacktestResponse],
+    summary="Kullanıcı backtest listesini döner",
 )
-def list_backtests(
+async def list_backtests(
     preset_id: Optional[UUID] = None,
     status_filter: Optional[str] = Query(None, alias="status"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
-    Kullanıcının backtestlerini (veya admin ise tamamını) döner.
-    İsteğe bağlı preset_id ve status filtresi.
+    Sadece authenticate kullanıcılar:
+    - Normal kullanıcı: kendi backtestleri (+ organization paylaşımı ileride)
+    - Admin: tüm backtestler
     """
-    q = db.query(BacktestRun)
+    stmt = select(BacktestRun)
+
     if not current_user.is_superuser:
-        q = q.filter(
-            (BacktestRun.owner_id == current_user.id)
-            | (
-                BacktestRun.organization_id.isnot(None)
-                & (
-                    BacktestRun.organization_id
-                    == current_user.organization_id
-                )
-            )
-        )
+        # Basit: sadece kullanıcının kendi kayıtları
+        stmt = stmt.where(BacktestRun.owner_id == current_user.id)
+
     if preset_id:
-        q = q.filter(BacktestRun.preset_id == preset_id)
+        stmt = stmt.where(BacktestRun.preset_id == preset_id)
     if status_filter:
-        q = q.filter(BacktestRun.status == status_filter)
-    return q.order_by(BacktestRun.created_at.desc()).all()
+        stmt = stmt.where(BacktestRun.status == status_filter)
+
+    stmt = stmt.order_by(BacktestRun.created_at.desc())
+    result = await db.execute(stmt)
+    runs = result.scalars().all()
+    return runs
 
 
 @router.get(
     "/{run_id}",
     response_model=BacktestResponse,
+    summary="Tekil backtest detayı",
 )
-def get_backtest(
+async def get_backtest(
     run_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    q = db.query(BacktestRun).filter(BacktestRun.id == run_id)
+    stmt = select(BacktestRun).where(BacktestRun.id == run_id)
     if not current_user.is_superuser:
-        q = q.filter(
-            (BacktestRun.owner_id == current_user.id)
-            | (
-                BacktestRun.organization_id.isnot(None)
-                & (
-                    BacktestRun.organization_id
-                    == current_user.organization_id
-                )
-            )
-        )
-    run = q.first()
+        stmt = stmt.where(BacktestRun.owner_id == current_user.id)
+
+    result = await db.execute(stmt)
+    run = result.scalar_one_or_none()
     if not run:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -157,21 +118,21 @@ def get_backtest(
 @router.patch(
     "/{run_id}",
     response_model=BacktestResponse,
+    summary="Runner için backtest güncelleme endpointi",
 )
-def update_backtest(
+async def update_backtest(
     run_id: UUID,
     payload: BacktestUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Runner / worker burayı kullanarak:
-    - status
-    - metrics
-    - report_ref
-    alanlarını günceller.
-    UI sonuçları buradan okuyacak.
+    Gerçek runner entegrasyonu için bırakılıyor.
+    Bu vertical slice'ta FE tarafından kullanılmıyor.
     """
-    run = db.query(BacktestRun).filter(BacktestRun.id == run_id).first()
+    result = await db.execute(
+        select(BacktestRun).where(BacktestRun.id == run_id)
+    )
+    run = result.scalar_one_or_none()
     if not run:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -185,6 +146,6 @@ def update_backtest(
     if payload.report_ref is not None:
         run.report_ref = payload.report_ref
 
-    db.commit()
-    db.refresh(run)
+    await db.commit()
+    await db.refresh(run)
     return run

@@ -24,12 +24,30 @@ export default function ExpertsPage() {
       const formData = new FormData()
       formData.append('file', selectedFile)
 
-      const response = await fetch('http://localhost:8000/api/v1/eas/upload', {
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+
+      const response = await fetch(`${API_BASE}/eas/upload`, {
         method: 'POST',
         body: formData,
       })
 
+      if (!response.ok) {
+        const txt = await response.text()
+        throw new Error(txt || 'Upload failed')
+      }
+
       const data = await response.json()
+
+      // Beklenen normalize response:
+      // {
+      //   "ea": { "name": str, "platform": str, "file_size": int, "has_source": bool },
+      //   "parameters": {
+      //      "extracted": int,
+      //      "summary": { "optimizable_count": int, "group_count": int, "groups": [...] },
+      //      "details": [...]
+      //   }
+      // }
+      // Backend farklı dönse bile, mevcut alanlar üzerinden en yakın eşleşmeyi UI'da gösteriyoruz.
       setUploadResult(data)
       setSelectedFile(null)
     } catch (error) {
