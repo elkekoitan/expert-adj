@@ -20,6 +20,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.trading import TradingAccount
 from app.models.user import User
+from app.core.security import decrypt_sensitive_value  # MT5 şifresi için
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -227,19 +228,77 @@ async def delete_account(
 
 @router.post(
     "/{account_id}/test-connection",
-    summary="Hesap bağlantı testi (Faz 1: mock success yok, açık 501)",
+    summary="Gerçek MT5 bağlantı testi",
 )
-async def test_connection(account_id: UUID):
+async def test_connection(
+    account_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
-    Faz 1:
-    - Burada sahte 'connected: true' dönmek YASAK.
-    - Gerçek MT4/MT5 runner entegrasyonu Faz 2'de gelecek.
-    - Şimdilik bilinçli olarak 501 Not Implemented döneriz.
+    Gerçek MT5 bağlantı testi:
+    - TradingAccount owner doğrulama
+    - Şifreyi decrypt etme
+    - runner/mt5/live_connection.MT5LiveConnection ile MT5 terminaline bağlanma
+    - Sonucu is_connected + diagnostics olarak döner
     """
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Account connection test will be implemented with MT4/MT5 runner in Phase 2.",
+    # Account çek
+    result = await db.execute(
+        select(TradingAccount).where(
+            TradingAccount.id == account_id,
+            TradingAccount.owner_id == current_user.id,
+        )
     )
+    acc = result.scalar_one_or_none()
+    if not acc:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # Zorunlu alanlar
+    if not getattr(acc, "broker_server", None) or not getattr(acc, "account_number", None) or not getattr(acc, "encrypted_password", None):
+        raise HTTPException(
+            status_code=400,
+            detail="Account missing MT5 connection fields (broker_server/account_number/encrypted_password).",
+        )
+
+    # runner/MT5 import
+    try:
+        from runner.mt5.live_connection import MT5LiveConnection  # type: ignore
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="MT5 runner not available. Ensure runner package is on PYTHONPATH.",
+        )
+
+    # Şifre decrypt
+    try:
+        password = decrypt_sensitive_value(acc.encrypted_password)
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to decrypt MT5 password.",
+        )
+
+    conn = MT5LiveConnection()
+    ok = conn.connect(
+        login=int(acc.account_number),
+        password=password,
+        server=acc.broker_server,
+    )
+
+    if not ok:
+        conn.disconnect()
+        return {
+            "is_connected": False,
+            "diagnostics": "MT5 login failed. Check terminal running state, broker server, login and password.",
+        }
+
+    info = conn.get_account_info() or {}
+    conn.disconnect()
+
+    return {
+        "is_connected": True,
+        "diagnostics": f"Connected to {info.get('server')} / {info.get('login')} / balance={info.get('balance')}",
+    }
 
 
 # ==================== LIVE SESSIONS ====================
