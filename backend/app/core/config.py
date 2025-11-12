@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     S3_ENDPOINT: str = "http://localhost:9000"
     S3_ACCESS_KEY: str = "minioadmin"
     S3_SECRET_KEY: str = "minioadmin"
+
+    # Admin seed (Faz 1+)
+    FIRST_SUPERUSER: str | None = None
+    FIRST_SUPERUSER_PASSWORD: str | None = None
     S3_BUCKET_NAME: str = "mt-optimizer"
     S3_REGION: str = "us-east-1"
     S3_USE_SSL: bool = False
