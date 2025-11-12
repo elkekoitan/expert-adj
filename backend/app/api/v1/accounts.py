@@ -1,20 +1,27 @@
 """
 Trading Account Management Endpoints
+
+Faz 1 gereği:
+- MOCK endpointler kaldırıldı.
+- Tüm uçlar ya gerçek mantıkla ya da 501 Not Implemented ile döner.
+- Üretim ortamında sahte başarı yok.
 """
 
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from app.core.database import get_db
-from app.services.account_service import AccountService, get_account_service
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-# from app.core.security import get_current_user  # TODO: Enable when auth is ready
+from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.trading import TradingAccount
+from app.models.user import User
 
-router = APIRouter()
+router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 
 # ==================== REQUEST MODELS ====================
@@ -59,136 +66,180 @@ class LiveSessionUpdate(BaseModel):
 # ==================== ENDPOINTS ====================
 
 
-@router.post("/")
-async def create_account(account: AccountCreate):
+@router.post(
+    "/",
+    status_code=status.HTTP_201_CREATED,
+    summary="Gerçek trading account oluştur (Faz 1: sadece iskelet, mock yok)",
+)
+async def create_account(
+    account: AccountCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
-    Add trading account (demo/live)
+    TradingAccount kaydı için iskelet endpoint.
 
-    Request body:
-    ```json
-    {
-        "platform": "MT4",
-        "broker_server": "Tickmill-Demo",
-        "account_number": "12345678",
-        "password": "your_password",
-        "label": "My Demo Account",
-        "account_type": "demo"
-    }
-    ```
+    Faz 1'de:
+    - Kaydı güvenli şekilde oluşturmak için model ve auth entegrasyonu hazır.
+    - MT4/MT5 bağlantı testi ve şifre encrypt Faz 2'de detaylandırılacak.
     """
-    # TODO: Implement account creation
-    # 1. Encrypt password
-    # 2. Test connection
-    # 3. Store in database
-    # 4. Return account info
-
+    # Faz 2'de: password encrypt + gerçek bağlantı testi eklenecek.
+    new_acc = TradingAccount(
+        owner_id=current_user.id,
+        platform=account.platform,
+        broker_server=account.broker_server,
+        account_number=account.account_number,
+        account_type=account.account_type,
+        label=account.label,
+        is_active=True,
+        is_connected=False,
+    )
+    db.add(new_acc)
+    await db.commit()
+    await db.refresh(new_acc)
     return {
-        "id": "account_123",
-        "platform": account.platform,
-        "broker_server": account.broker_server,
-        "account_number": account.account_number,
-        "label": account.label,
-        "account_type": account.account_type,
-        "is_active": True,
-        "is_connected": False,
-        "created_at": datetime.now().isoformat(),
+        "id": str(new_acc.id),
+        "platform": new_acc.platform,
+        "broker_server": new_acc.broker_server,
+        "account_number": new_acc.account_number,
+        "label": new_acc.label,
+        "account_type": new_acc.account_type,
+        "is_active": new_acc.is_active,
+        "is_connected": new_acc.is_connected,
     }
 
 
-@router.get("/")
-async def list_accounts():
-    """
-    List all trading accounts
-    """
-    # TODO: Implement account listing
-    # Get from database
+@router.get(
+    "/",
+    summary="Kullanıcının trading account listesini döner",
+)
+async def list_accounts(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(TradingAccount).where(TradingAccount.owner_id == current_user.id)
+    )
+    accounts = result.scalars().all()
+    return [
+        {
+            "id": str(a.id),
+            "platform": a.platform,
+            "broker_server": a.broker_server,
+            "account_number": a.account_number,
+            "label": a.label,
+            "account_type": a.account_type,
+            "is_active": a.is_active,
+            "is_connected": a.is_connected,
+        }
+        for a in accounts
+    ]
 
+
+@router.get(
+    "/{account_id}",
+    summary="Tekil account detayı",
+)
+async def get_account(
+    account_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(TradingAccount).where(
+            TradingAccount.id == account_id,
+            TradingAccount.owner_id == current_user.id,
+        )
+    )
+    acc = result.scalar_one_or_none()
+    if not acc:
+        raise HTTPException(status_code=404, detail="Account not found")
     return {
-        "accounts": [
-            {
-                "id": "account_123",
-                "platform": "MT4",
-                "broker_server": "Tickmill-Demo",
-                "account_number": "12345678",
-                "label": "My Demo Account",
-                "account_type": "demo",
-                "is_active": True,
-                "is_connected": True,
-                "balance": 10000.00,
-                "equity": 10250.00,
-                "margin": 500.00,
-                "free_margin": 9750.00,
-                "profit": 250.00,
-            }
-        ],
-        "total": 1,
+        "id": str(acc.id),
+        "platform": acc.platform,
+        "broker_server": acc.broker_server,
+        "account_number": acc.account_number,
+        "label": acc.label,
+        "account_type": acc.account_type,
+        "is_active": acc.is_active,
+        "is_connected": acc.is_connected,
     }
 
 
-@router.get("/{account_id}")
-async def get_account(account_id: str):
-    """
-    Get account details
-    """
-    # TODO: Implement account retrieval
+@router.patch(
+    "/{account_id}",
+    summary="Account güncelle (Faz 1: temel alanlar)",
+)
+async def update_account(
+    account_id: UUID,
+    update: AccountUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(TradingAccount).where(
+            TradingAccount.id == account_id,
+            TradingAccount.owner_id == current_user.id,
+        )
+    )
+    acc = result.scalar_one_or_none()
+    if not acc:
+        raise HTTPException(status_code=404, detail="Account not found")
 
+    if update.label is not None:
+        acc.label = update.label
+    if update.is_active is not None:
+        acc.is_active = update.is_active
+
+    await db.commit()
+    await db.refresh(acc)
     return {
-        "id": account_id,
-        "platform": "MT4",
-        "broker_server": "Tickmill-Demo",
-        "account_number": "12345678",
-        "label": "My Demo Account",
-        "account_type": "demo",
-        "is_active": True,
-        "is_connected": True,
-        "balance": 10000.00,
-        "equity": 10250.00,
-        "margin": 500.00,
-        "free_margin": 9750.00,
-        "profit": 250.00,
-        "leverage": 100,
-        "currency": "USD",
-        "last_heartbeat": datetime.now().isoformat(),
+        "id": str(acc.id),
+        "label": acc.label,
+        "is_active": acc.is_active,
     }
 
 
-@router.patch("/{account_id}")
-async def update_account(account_id: str, update: AccountUpdate):
+@router.delete(
+    "/{account_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Account sil",
+)
+async def delete_account(
+    account_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(TradingAccount).where(
+            TradingAccount.id == account_id,
+            TradingAccount.owner_id == current_user.id,
+        )
+    )
+    acc = result.scalar_one_or_none()
+    if not acc:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    await db.delete(acc)
+    await db.commit()
+    return
+
+
+@router.post(
+    "/{account_id}/test-connection",
+    summary="Hesap bağlantı testi (Faz 1: mock success yok, açık 501)",
+)
+async def test_connection(account_id: UUID):
     """
-    Update account
+    Faz 1:
+    - Burada sahte 'connected: true' dönmek YASAK.
+    - Gerçek MT4/MT5 runner entegrasyonu Faz 2'de gelecek.
+    - Şimdilik bilinçli olarak 501 Not Implemented döneriz.
     """
-    # TODO: Implement account update
-
-    return {"id": account_id, "updated": True}
-
-
-@router.delete("/{account_id}")
-async def delete_account(account_id: str):
-    """
-    Delete account
-    """
-    # TODO: Implement account deletion
-
-    return {"id": account_id, "deleted": True}
-
-
-@router.post("/{account_id}/test-connection")
-async def test_connection(account_id: str):
-    """
-    Test account connection
-    """
-    # TODO: Implement connection test
-    # 1. Get account from database
-    # 2. Try to connect to MT4/MT5
-    # 3. Return connection status
-
-    return {
-        "account_id": account_id,
-        "connected": True,
-        "balance": 10000.00,
-        "equity": 10250.00,
-        "server_time": datetime.now().isoformat(),
-    }
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Account connection test will be implemented with MT4/MT5 runner in Phase 2.",
+    )
 
 
 # ==================== LIVE SESSIONS ====================
@@ -196,72 +247,18 @@ async def test_connection(account_id: str):
 
 @router.post("/{account_id}/sessions/start")
 async def start_live_session(account_id: str, session: LiveSessionCreate):
-    """
-    Start live trading session
-
-    This will:
-    1. Connect to MT4/MT5 account
-    2. Deploy EA with specified parameters
-    3. Start monitoring
-
-    Request body:
-    ```json
-    {
-        "account_id": "account_123",
-        "ea_version_id": "ea_version_456",
-        "symbol": "EURUSD",
-        "timeframe": "M15",
-        "parameters": {
-            "lot": 0.01,
-            "tp": 500,
-            "sl": 250
-        },
-        "magic_numbers": [10001, 10002]
-    }
-    ```
-    """
-    # TODO: Implement live session start
-    # 1. Get account from database
-    # 2. Get EA from database
-    # 3. Connect to MT4/MT5
-    # 4. Deploy EA
-    # 5. Start monitoring
-
-    return {
-        "session_id": "session_789",
-        "account_id": account_id,
-        "ea_version_id": session.ea_version_id,
-        "symbol": session.symbol,
-        "timeframe": session.timeframe,
-        "status": "running",
-        "started_at": datetime.now().isoformat(),
-    }
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Live session start will be implemented with real MT4/MT5 integration.",
+    )
 
 
 @router.get("/{account_id}/sessions")
 async def list_sessions(account_id: str):
-    """
-    List trading sessions for account
-    """
-    # TODO: Implement session listing
-
-    return {
-        "sessions": [
-            {
-                "id": "session_789",
-                "account_id": account_id,
-                "ea_name": "SmartMartingale Pro",
-                "symbol": "EURUSD",
-                "timeframe": "M15",
-                "status": "running",
-                "current_profit": 125.50,
-                "total_trades": 15,
-                "winning_trades": 12,
-                "started_at": datetime.now().isoformat(),
-            }
-        ],
-        "total": 1,
-    }
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Live session listing will be implemented with real MT4/MT5 integration.",
+    )
 
 
 @router.get("/{account_id}/sessions/{session_id}")
