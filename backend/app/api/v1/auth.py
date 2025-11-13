@@ -1,15 +1,15 @@
 """
 Authentication endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.database import get_db
 from app.models.user import User
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(tags=["auth"])
 
 
 class TokenResponse(BaseModel):
@@ -28,9 +28,9 @@ async def authenticate_user(
     """
     Verilen email/parola ile kullanıcı doğrula.
     """
-    result = await session.execute(
-        User.__table__.select().where(User.email == email)
-    )
+    from sqlalchemy import select
+
+    result = await session.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user:
         return None
@@ -76,5 +76,7 @@ async def read_me(current_user: User = Depends(security.get_current_user)):
         "username": current_user.username,
         "is_active": current_user.is_active,
         "is_superuser": current_user.is_superuser,
-        "organization_id": str(current_user.organization_id) if current_user.organization_id else None,
+        "organization_id": str(current_user.organization_id)
+        if current_user.organization_id
+        else None,
     }

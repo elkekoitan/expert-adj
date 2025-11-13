@@ -3,11 +3,14 @@ Expert Advisor endpoints
 """
 
 import hashlib
+import tempfile
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 from uuid import UUID, uuid4
 
 from app.core.database import get_db
+from app.services.ea_analyzer import analyze_ea_file
 from app.services.ea_service import EAService
 from app.services.s3 import S3Service, get_s3_service
 from app.utils.mql_parser import extract_parameters_from_mql, generate_parameter_summary
@@ -130,3 +133,55 @@ async def get_ea_parameters(ea_id: str):
     Get EA parameters schema
     """
     return {"ea_id": ea_id, "parameters": []}
+
+
+@router.post("/analyze")
+async def analyze_ea(
+    file: UploadFile = File(...),
+):
+    """
+    Analyze Expert Advisor file (compiled .ex4/.ex5 or source .mq4/.mq5)
+
+    Returns:
+    - Metadata (name, version, platform)
+    - Detected parameters
+    - Trading logic analysis
+    - Risk assessment
+    - Optimization recommendations
+    """
+    # Validate file extension
+    allowed_extensions = [".ex4", ".ex5", ".mq4", ".mq5"]
+    file_ext = f".{file.filename.split('.')[-1]}" if "." in file.filename else ""
+
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file extension. Allowed: {', '.join(allowed_extensions)}",
+        )
+
+    # Read file content
+    content = await file.read()
+
+    # Save to temporary file for analysis
+    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+        temp_file.write(content)
+        temp_path = temp_file.name
+
+    try:
+        # Analyze the EA
+        analysis_results = analyze_ea_file(temp_path)
+
+        # Add filename to results
+        analysis_results["filename"] = file.filename
+        analysis_results["file_size"] = len(content)
+
+        return analysis_results
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+    finally:
+        # Clean up temporary file
+        try:
+            Path(temp_path).unlink()
+        except Exception:
+            pass

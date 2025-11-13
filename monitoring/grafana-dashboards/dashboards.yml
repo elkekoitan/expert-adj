@@ -1,0 +1,17 @@
+# ============================================================
+# GRAFANA DASHBOARD PROVISIONING
+# ============================================================
+
+apiVersion: 1
+
+providers:
+  - name: 'MT Optimizer Dashboards'
+    orgId: 1
+    folder: 'MT Optimizer'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true

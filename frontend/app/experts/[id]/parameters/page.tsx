@@ -1,87 +1,237 @@
-"use client"
+"use client";
 
-import { useState } from 'react'
-import { Save, Copy, Star, TrendingUp, Settings2, ChevronDown, ChevronRight } from 'lucide-react'
+import { useState } from "react";
+import {
+  Save,
+  Copy,
+  Star,
+  TrendingUp,
+  Settings2,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 
-// Mock data - will be replaced with API calls
-const mockParameters = {
-  "GENEL SİSTEM AYARLARI": [
-    { name: "MaxCascadeRobots", type: "int", value: 5, default: 5, description: "AKTİF ROBOT SAYISI (1-5)", min: 1, max: 5 },
-    { name: "TriggerLevel", type: "int", value: 2, default: 2, description: "TETİKLEME KADEMESİ (1-10)", min: 1, max: 10 },
-    { name: "DistancePercent", type: "double", value: 50.0, default: 50.0, description: "MESAFE ÇARPANI (%)" },
-    { name: "LotPercent", type: "double", value: 100.0, default: 100.0, description: "LOT ÇARPANI (%)" },
-  ],
-  "ZAMAN AYARLARI": [
-    { name: "StartHour", type: "int", value: 1, default: 1, description: "Başlangıç Saati", min: 0, max: 23 },
-    { name: "StartMinute", type: "int", value: 15, default: 15, description: "Başlangıç Dakikası", min: 0, max: 59 },
-    { name: "EndHour", type: "int", value: 22, default: 22, description: "Bitiş Saati", min: 0, max: 23 },
-    { name: "EndMinute", type: "int", value: 0, default: 0, description: "Bitiş Dakikası", min: 0, max: 59 },
-    { name: "LoopWaitMinutes", type: "int", value: 30, default: 30, description: "Döngü Bekleme (Dakika)", min: 1, max: 120 },
-  ],
-  "TİCARET AYARLARI": [
-    { name: "TradeDirection", type: "int", value: 2, default: 2, description: "YÖN: 0=Buy, 1=Sell, 2=İki Yön", min: 0, max: 2 },
-    { name: "DailyProfitTarget", type: "double", value: 500.0, default: 500.0, description: "GÜNLÜK KAR HEDEFİ ($)" },
-  ],
-  "ROBOT 1 - KAR HEDEFLERİ": [
-    { name: "Robot1_BuyProfit", type: "double", value: 50.0, default: 50.0, description: "BUY ZİNCİR KAR HEDEFİ ($)" },
-    { name: "Robot1_SellProfit", type: "double", value: 50.0, default: 50.0, description: "SELL ZİNCİR KAR HEDEFİ ($)" },
-  ],
+// Type definitions
+interface Parameter {
+  name: string;
+  type: string;
+  value: number;
+  default: number;
+  description: string;
+  min?: number;
+  max?: number;
 }
 
+type ParameterGroups = {
+  [key: string]: Parameter[];
+};
+
+// Mock data - will be replaced with API calls
+const mockParameters: ParameterGroups = {
+  "GENEL SİSTEM AYARLARI": [
+    {
+      name: "MaxCascadeRobots",
+      type: "int",
+      value: 5,
+      default: 5,
+      description: "AKTİF ROBOT SAYISI (1-5)",
+      min: 1,
+      max: 5,
+    },
+    {
+      name: "TriggerLevel",
+      type: "int",
+      value: 2,
+      default: 2,
+      description: "TETİKLEME KADEMESİ (1-10)",
+      min: 1,
+      max: 10,
+    },
+    {
+      name: "DistancePercent",
+      type: "double",
+      value: 50.0,
+      default: 50.0,
+      description: "MESAFE ÇARPANI (%)",
+    },
+    {
+      name: "LotPercent",
+      type: "double",
+      value: 100.0,
+      default: 100.0,
+      description: "LOT ÇARPANI (%)",
+    },
+  ],
+  "ZAMAN AYARLARI": [
+    {
+      name: "StartHour",
+      type: "int",
+      value: 1,
+      default: 1,
+      description: "Başlangıç Saati",
+      min: 0,
+      max: 23,
+    },
+    {
+      name: "StartMinute",
+      type: "int",
+      value: 15,
+      default: 15,
+      description: "Başlangıç Dakikası",
+      min: 0,
+      max: 59,
+    },
+    {
+      name: "EndHour",
+      type: "int",
+      value: 22,
+      default: 22,
+      description: "Bitiş Saati",
+      min: 0,
+      max: 23,
+    },
+    {
+      name: "EndMinute",
+      type: "int",
+      value: 0,
+      default: 0,
+      description: "Bitiş Dakikası",
+      min: 0,
+      max: 59,
+    },
+    {
+      name: "LoopWaitMinutes",
+      type: "int",
+      value: 30,
+      default: 30,
+      description: "Döngü Bekleme (Dakika)",
+      min: 1,
+      max: 120,
+    },
+  ],
+  "TİCARET AYARLARI": [
+    {
+      name: "TradeDirection",
+      type: "int",
+      value: 2,
+      default: 2,
+      description: "YÖN: 0=Buy, 1=Sell, 2=İki Yön",
+      min: 0,
+      max: 2,
+    },
+    {
+      name: "DailyProfitTarget",
+      type: "double",
+      value: 500.0,
+      default: 500.0,
+      description: "GÜNLÜK KAR HEDEFİ ($)",
+    },
+  ],
+  "ROBOT 1 - KAR HEDEFLERİ": [
+    {
+      name: "Robot1_BuyProfit",
+      type: "double",
+      value: 50.0,
+      default: 50.0,
+      description: "BUY ZİNCİR KAR HEDEFİ ($)",
+    },
+    {
+      name: "Robot1_SellProfit",
+      type: "double",
+      value: 50.0,
+      default: 50.0,
+      description: "SELL ZİNCİR KAR HEDEFİ ($)",
+    },
+  ],
+};
+
 const mockPresets = [
-  { id: 1, name: "Conservative - Low Risk", isFavorite: true, tags: ["conservative", "low-risk"] },
-  { id: 2, name: "Aggressive - High Return", isFavorite: false, tags: ["aggressive", "high-risk"] },
-  { id: 3, name: "Scalping Strategy", isFavorite: true, tags: ["scalping", "short-term"] },
-]
+  {
+    id: 1,
+    name: "Conservative - Low Risk",
+    isFavorite: true,
+    tags: ["conservative", "low-risk"],
+  },
+  {
+    id: 2,
+    name: "Aggressive - High Return",
+    isFavorite: false,
+    tags: ["aggressive", "high-risk"],
+  },
+  {
+    id: 3,
+    name: "Scalping Strategy",
+    isFavorite: true,
+    tags: ["scalping", "short-term"],
+  },
+];
 
 export default function ParametersPage() {
-  const [parameters, setParameters] = useState(mockParameters)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(Object.keys(mockParameters)))
-  const [presetName, setPresetName] = useState("")
-  const [showSavePreset, setShowSavePreset] = useState(false)
-  const [selectedPreset, setSelectedPreset] = useState<number | null>(null)
+  const [parameters, setParameters] = useState(mockParameters);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    new Set(Object.keys(mockParameters)),
+  );
+  const [presetName, setPresetName] = useState("");
+  const [showSavePreset, setShowSavePreset] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
 
   const toggleGroup = (group: string) => {
-    const newExpanded = new Set(expandedGroups)
+    const newExpanded = new Set(expandedGroups);
     if (newExpanded.has(group)) {
-      newExpanded.delete(group)
+      newExpanded.delete(group);
     } else {
-      newExpanded.add(group)
+      newExpanded.add(group);
     }
-    setExpandedGroups(newExpanded)
-  }
+    setExpandedGroups(newExpanded);
+  };
 
-  const handleParameterChange = (group: string, paramIndex: number, value: string) => {
-    setParameters(prev => ({
-      ...prev,
-      [group]: prev[group].map((param, idx) =>
-        idx === paramIndex ? { ...param, value: parseFloat(value) || value } : param
-      )
-    }))
-  }
+  const handleParameterChange = (
+    group: string,
+    paramIndex: number,
+    value: string,
+  ) => {
+    setParameters((prev) => {
+      const groupParams = prev[group];
+      if (!groupParams) return prev;
+
+      return {
+        ...prev,
+        [group]: groupParams.map((param, idx) =>
+          idx === paramIndex
+            ? { ...param, value: parseFloat(value) || (value as any) }
+            : param,
+        ),
+      };
+    });
+  };
 
   const handleResetToDefault = (group: string, paramIndex: number) => {
-    setParameters(prev => ({
-      ...prev,
-      [group]: prev[group].map((param, idx) =>
-        idx === paramIndex ? { ...param, value: param.default } : param
-      )
-    }))
-  }
+    setParameters((prev) => {
+      const groupParams = prev[group];
+      if (!groupParams) return prev;
+
+      return {
+        ...prev,
+        [group]: groupParams.map((param, idx) =>
+          idx === paramIndex ? { ...param, value: param.default } : param,
+        ),
+      };
+    });
+  };
 
   const handleSavePreset = () => {
     // TODO: API call to save preset
-    console.log("Saving preset:", presetName, parameters)
-    setShowSavePreset(false)
-    setPresetName("")
-    alert(`Preset "${presetName}" saved successfully!`)
-  }
+    console.log("Saving preset:", presetName, parameters);
+    setShowSavePreset(false);
+    setPresetName("");
+    alert(`Preset "${presetName}" saved successfully!`);
+  };
 
   const handleLoadPreset = (presetId: number) => {
-    setSelectedPreset(presetId)
+    setSelectedPreset(presetId);
     // TODO: Load preset parameters from API
-    alert(`Loading preset #${presetId}`)
-  }
+    alert(`Loading preset #${presetId}`);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
@@ -104,23 +254,30 @@ export default function ParametersPage() {
               </div>
 
               <div className="space-y-2 mb-4">
-                {mockPresets.map(preset => (
+                {mockPresets.map((preset) => (
                   <button
                     key={preset.id}
                     onClick={() => handleLoadPreset(preset.id)}
                     className={`w-full text-left p-3 rounded-lg transition-colors ${
                       selectedPreset === preset.id
-                        ? 'bg-blue-600'
-                        : 'bg-slate-700/50 hover:bg-slate-700'
+                        ? "bg-blue-600"
+                        : "bg-slate-700/50 hover:bg-slate-700"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-semibold text-sm">{preset.name}</span>
-                      {preset.isFavorite && <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />}
+                      <span className="font-semibold text-sm">
+                        {preset.name}
+                      </span>
+                      {preset.isFavorite && (
+                        <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {preset.tags.map(tag => (
-                        <span key={tag} className="text-xs bg-slate-600/50 px-2 py-0.5 rounded-full">
+                      {preset.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-xs bg-slate-600/50 px-2 py-0.5 rounded-full"
+                        >
                           {tag}
                         </span>
                       ))}
@@ -171,7 +328,9 @@ export default function ParametersPage() {
                       <ChevronRight className="w-5 h-5 text-blue-400" />
                     )}
                     <h3 className="text-lg font-semibold">{group}</h3>
-                    <span className="text-sm text-slate-400">({params.length} parameters)</span>
+                    <span className="text-sm text-slate-400">
+                      ({params.length} parameters)
+                    </span>
                   </div>
                 </button>
 
@@ -179,11 +338,18 @@ export default function ParametersPage() {
                 {expandedGroups.has(group) && (
                   <div className="px-6 pb-6 space-y-4">
                     {params.map((param, idx) => (
-                      <div key={param.name} className="bg-slate-900/50 rounded-xl p-4">
+                      <div
+                        key={param.name}
+                        className="bg-slate-900/50 rounded-xl p-4"
+                      >
                         <div className="flex items-start justify-between mb-3">
                           <div>
-                            <label className="font-mono font-semibold text-sm">{param.name}</label>
-                            <p className="text-xs text-slate-400 mt-1">{param.description}</p>
+                            <label className="font-mono font-semibold text-sm">
+                              {param.name}
+                            </label>
+                            <p className="text-xs text-slate-400 mt-1">
+                              {param.description}
+                            </p>
                           </div>
                           <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">
                             {param.type}
@@ -194,8 +360,10 @@ export default function ParametersPage() {
                           <input
                             type="number"
                             value={param.value}
-                            onChange={(e) => handleParameterChange(group, idx, e.target.value)}
-                            step={param.type === 'double' ? '0.01' : '1'}
+                            onChange={(e) =>
+                              handleParameterChange(group, idx, e.target.value)
+                            }
+                            step={param.type === "double" ? "0.01" : "1"}
                             min={param.min}
                             max={param.max}
                             className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
@@ -211,7 +379,9 @@ export default function ParametersPage() {
 
                         {param.min !== undefined && param.max !== undefined && (
                           <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
-                            <span>Range: {param.min} - {param.max}</span>
+                            <span>
+                              Range: {param.min} - {param.max}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -255,5 +425,5 @@ export default function ParametersPage() {
         )}
       </div>
     </div>
-  )
+  );
 }

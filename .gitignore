@@ -54,6 +54,8 @@ Thumbs.db
 .env.production
 .env.test
 *.env
+.env.prod
+!.env.prod.example
 
 # Database
 *.db
@@ -74,6 +76,18 @@ coverage/
 *.pid
 *.seed
 *.pid.lock
+
+# Production Files
+backups/
+!backups/.gitkeep
+certbot/
+postgres_data/
+redis_data/
+minio_data/
+prometheus_data/
+grafana_data/
+results/
+!results/.gitkeep
 
 # MT5
 *.ex4
@@ -98,3 +112,6 @@ secrets/
 # Build outputs
 dist/
 build/
+
+.gemini/
+gha-creds-*.json
